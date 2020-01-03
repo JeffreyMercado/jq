@@ -539,12 +539,22 @@ block gen_import_meta(block import, block metadata) {
   return import;
 }
 
+static char* mangle_function_param(const char* function_name, int formal_count, const char* param_name) {
+  size_t bufsz = snprintf(NULL, 0, "_%s%d_%s_", function_name, formal_count, param_name);
+  char* mangled = jv_mem_calloc(sizeof(*mangled), bufsz + 1);
+  snprintf(mangled, bufsz + 1, "_%s%d_%s_", function_name, formal_count, param_name);
+  return mangled;
+}
+
 block gen_function(const char* name, block formals, block body) {
   inst* i = inst_new(CLOSURE_CREATE);
   for (inst* i = formals.last; i; i = i->prev) {
     if (i->op == CLOSURE_PARAM_REGULAR) {
       i->op = CLOSURE_PARAM;
-      body = gen_var_binding(gen_call(i->symbol, gen_noop()), i->symbol, body);
+      char* param_name = i->symbol;
+      char* mangled_name = i->symbol = mangle_function_param(name, block_count_formals(formals), param_name);
+      body = gen_var_binding(gen_call(mangled_name, gen_noop()), param_name, body);
+      jv_mem_free(param_name); // mangled name replaces param_name, clean it up
     }
     block_bind_subblock(inst_block(i), body, OP_IS_CALL_PSEUDO | OP_HAS_BINDING, 0);
   }
