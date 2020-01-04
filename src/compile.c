@@ -539,10 +539,15 @@ block gen_import_meta(block import, block metadata) {
   return import;
 }
 
-static char* mangle_function_param(const char* function_name, int formal_count, const char* param_name) {
-  size_t bufsz = snprintf(NULL, 0, "_%s%d_%s_", function_name, formal_count, param_name);
+static char* mangle_function_param(const char* function_name, block formals, const char* param_name) {
+  int formal_count = 0;
+  for (inst* i = formals.first; i; i = i->next) {
+    assert(i->op == CLOSURE_PARAM || i->op == CLOSURE_PARAM_REGULAR);
+    formal_count++;
+  }
+  size_t bufsz = snprintf(NULL, 0, "@%s/%d_%s", function_name, formal_count, param_name);
   char* mangled = jv_mem_calloc(sizeof(*mangled), bufsz + 1);
-  snprintf(mangled, bufsz + 1, "_%s%d_%s_", function_name, formal_count, param_name);
+  snprintf(mangled, bufsz + 1, "@%s/%d_%s", function_name, formal_count, param_name);
   return mangled;
 }
 
@@ -552,7 +557,7 @@ block gen_function(const char* name, block formals, block body) {
     if (i->op == CLOSURE_PARAM_REGULAR) {
       i->op = CLOSURE_PARAM;
       char* param_name = i->symbol;
-      char* mangled_name = i->symbol = mangle_function_param(name, block_count_formals(formals), param_name);
+      char* mangled_name = i->symbol = mangle_function_param(name, formals, param_name);
       body = gen_var_binding(gen_call(mangled_name, gen_noop()), param_name, body);
       jv_mem_free(param_name); // mangled name replaces param_name, clean it up
     }
